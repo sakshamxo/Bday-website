@@ -151,38 +151,14 @@ let modalCloseCallback = null;
 let isModalClosing = false;
 
 function closeNoteModal() {
-  if (isModalClosing) return;
-  isModalClosing = true;
-  
   const cb = modalCloseCallback;
   modalCloseCallback = null;
 
-  // Immediately remove pointer interaction so underlying buttons & balloons work without delay
+  modal.classList.remove('show');
+  modal.style.display = 'none';
   modal.style.pointerEvents = 'none';
-
-  if (motion) {
-    motion.to('.modal-backdrop', { opacity: 0, duration: 0.16 });
-    motion.to('.modal-card', {
-      scale: 0.8,
-      opacity: 0,
-      y: 15,
-      duration: 0.18,
-      ease: 'power2.in',
-      onComplete: () => {
-        modal.classList.remove('show');
-        modal.style.display = 'none';
-        resetModalButtons();
-        isModalClosing = false;
-        if (cb) cb();
-      }
-    });
-  } else {
-    modal.classList.remove('show');
-    modal.style.display = 'none';
-    resetModalButtons();
-    isModalClosing = false;
-    if (cb) cb();
-  }
+  resetModalButtons();
+  if (cb) cb();
 }
 
 function showMessage(message, onClose = null) {
@@ -911,14 +887,10 @@ function createBalloons() {
     shine.className = 'balloon-shine';
     balloon.appendChild(shine);
 
-    let isPoppingThis = false;
+    let hasPopped = false;
     const popThisBalloon = (e) => {
-      if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-      if (isPoppingThis || balloon.classList.contains('popped') || balloon.classList.contains('popping')) return;
-      isPoppingThis = true;
+      if (hasPopped || balloon.classList.contains('popped') || balloon.classList.contains('popping')) return;
+      hasPopped = true;
       balloon.classList.add('popping');
       balloon.style.pointerEvents = 'none';
       
@@ -953,14 +925,15 @@ function createBalloons() {
                   completeCard.classList.add('show');
                 }
               }
-            }, 250);
+            }, 200);
           }
         });
       });
     };
 
-    balloon.addEventListener('click', popThisBalloon);
+    balloon.addEventListener('touchstart', popThisBalloon, { passive: true });
     balloon.addEventListener('pointerdown', popThisBalloon);
+    balloon.addEventListener('click', popThisBalloon);
     field.appendChild(balloon);
   });
   

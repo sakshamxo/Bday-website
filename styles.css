@@ -1103,7 +1103,8 @@ h1 em, h2 em {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: clamp(10px, 2vh, 20px) 16px;
+  padding: clamp(12px, 2.5vh, 24px) 16px clamp(28px, 6vh, 48px);
+  padding-bottom: calc(clamp(28px, 6vh, 48px) + env(safe-area-inset-bottom, 0px));
   background: 
     radial-gradient(circle at 20% 25%, rgba(255, 215, 230, 0.45) 0%, transparent 45%),
     radial-gradient(circle at 80% 70%, rgba(255, 235, 205, 0.45) 0%, transparent 45%),
