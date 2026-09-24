@@ -4,6 +4,18 @@ const modal = $('#messageModal');
 const audio = $('#backgroundMusic');
 const musicToggle = $('#musicToggle');
 
+let audioUnlocked = false;
+function tryUnlockAudio() {
+  if (audioUnlocked || !audio) return;
+  audio.play().then(() => {
+    audioUnlocked = true;
+    setMusicState(true);
+  }).catch(() => {});
+}
+window.addEventListener('touchstart', tryUnlockAudio, { once: true, passive: true });
+window.addEventListener('pointerdown', tryUnlockAudio, { once: true, passive: true });
+window.addEventListener('click', tryUnlockAudio, { once: true });
+
 function showScene(id) {
   const target = $(id);
   if (!target) return;
@@ -24,7 +36,7 @@ function showScene(id) {
   if (id === '#memoryScene') {
     buildCards();
   } else if (id === '#roseScene') {
-    init3DRoseScene();
+    resume3DRoseScene();
   }
 
   if (motion) {
@@ -41,6 +53,9 @@ function hideScene(element) {
   element.style.display = 'none';
   element.style.visibility = 'hidden';
   element.style.pointerEvents = 'none';
+  if (element.id === 'roseScene') {
+    pause3DRoseScene();
+  }
   if (motion) {
     motion.killTweensOf(element);
     motion.set(element, { opacity: 0 });
@@ -345,12 +360,15 @@ function launchOpening() {
 
 startArrow.addEventListener('pointerdown', (event) => {
   if (arrowReleased) return;
+  tryUnlockAudio();
   updateAimVector();
   arrowDragging = true;
   startPointerX = event.clientX;
   startPointerY = event.clientY;
   currentPull = 0;
-  startArrow.setPointerCapture(event.pointerId);
+  try {
+    startArrow.setPointerCapture(event.pointerId);
+  } catch(e) {}
   bowArrowRig.classList.add('pulling');
 });
 
@@ -377,7 +395,7 @@ function releasePull() {
   arrowDragging = false;
   bowArrowRig.classList.remove('pulling');
   
-  if (currentPull > 12) {
+  if (currentPull > 10) {
     launchOpening();
   } else {
     // Return to rest if not pulled enough
@@ -397,6 +415,13 @@ function releasePull() {
 
 startArrow.addEventListener('pointerup', releasePull);
 startArrow.addEventListener('pointercancel', releasePull);
+startArrow.addEventListener('touchend', (e) => {
+  if (arrowDragging) {
+    releasePull();
+  } else if (!arrowReleased) {
+    launchOpening();
+  }
+});
 startArrow.addEventListener('click', () => {
   if (!arrowReleased && !arrowDragging) {
     launchOpening();
@@ -668,20 +693,31 @@ function unwrapGift() {
 
 const giftBtn = $('#giftButton');
 if (giftBtn) {
-  giftBtn.addEventListener('click', unwrapGift);
+  const handleGiftUnwrap = (e) => {
+    if (e && e.type === 'touchstart') e.preventDefault();
+    unwrapGift();
+  };
+  giftBtn.addEventListener('click', handleGiftUnwrap);
+  giftBtn.addEventListener('touchstart', handleGiftUnwrap, { passive: false });
 }
 
 // Proceed from Video Card to Balloon Scene
 const toBalloonsBtn = $('#toBalloons');
 if (toBalloonsBtn) {
-  toBalloonsBtn.addEventListener('click', () => {
+  const handleToBalloons = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (giftVideo && !giftVideo.paused) {
       giftVideo.pause();
     }
     hideScene($('#giftScene'));
     showScene('#balloonScene');
     createBalloons();
-  });
+  };
+  toBalloonsBtn.addEventListener('click', handleToBalloons);
+  toBalloonsBtn.addEventListener('touchend', handleToBalloons);
 }
 
 const balloonNotes = [
@@ -696,52 +732,6 @@ const balloonNotes = [
   'The world is luckier with you in it. ♥'
 ];
 let popped = 0;
-
-function initAmbientBalloons() {
-  const container = $('#ambientBalloons');
-  if (!container || container.childElementCount) return;
-
-  const pastelColors = [
-    '#ff9ebb', '#ffd180', '#a8e6cf',
-    '#b3e5fc', '#d1c4e9', '#ff80ab',
-    '#ffe082', '#b2dfdb', '#f48fb1'
-  ];
-
-  for (let i = 0; i < 10; i++) {
-    const b = document.createElement('div');
-    b.className = 'ambient-balloon';
-    const color = pastelColors[i % pastelColors.length];
-    const size = 32 + Math.random() * 26;
-    const left = 5 + Math.random() * 90;
-    const duration = 12 + Math.random() * 10;
-    const delay = -(Math.random() * 18);
-
-    b.style.width = `${size}px`;
-    b.style.height = `${size * 1.22}px`;
-    b.style.left = `${left}%`;
-    b.style.backgroundColor = color;
-    b.style.background = `radial-gradient(circle at 35% 30%, ${color}ee 0%, ${color} 65%, rgba(0,0,0,0.15) 100%)`;
-    b.style.opacity = `${0.22 + Math.random() * 0.22}`;
-    b.style.filter = `blur(${1 + Math.random() * 2}px)`;
-
-    container.appendChild(b);
-
-    if (motion) {
-      motion.fromTo(b,
-        { y: window.innerHeight + 80, x: (Math.random() - 0.5) * 30, rotation: (Math.random() - 0.5) * 12 },
-        {
-          y: -140,
-          x: `+=${(Math.random() - 0.5) * 60}`,
-          rotation: `+=${(Math.random() - 0.5) * 18}`,
-          duration: duration,
-          delay: delay,
-          repeat: -1,
-          ease: 'none'
-        }
-      );
-    }
-  }
-}
 
 function burstBalloon(balloon, color, callback) {
   const scene = $('#balloonScene');
@@ -769,13 +759,13 @@ function burstBalloon(balloon, color, callback) {
   if (motion) {
     motion.fromTo(ring, 
       { width: 10, height: 10, x: -5, y: -5, opacity: 1, borderWidth: 4 },
-      { width: 120, height: 120, x: -60, y: -60, opacity: 0, borderWidth: 1, duration: 0.42, ease: 'power2.out' }
+      { width: 120, height: 120, x: -60, y: -60, opacity: 0, borderWidth: 1, duration: 0.38, ease: 'power2.out' }
     );
   }
 
   // Rubber shards & sparkle confetti
   const symbols = ['✦', '♥', '♡', '•'];
-  const shardCount = 28;
+  const shardCount = 24;
   
   for (let i = 0; i < shardCount; i++) {
     const shard = document.createElement('span');
@@ -787,8 +777,8 @@ function burstBalloon(balloon, color, callback) {
       shard.style.color = Math.random() > 0.5 ? color : '#ffd166';
       shard.style.fontSize = `${13 + Math.random() * 12}px`;
     } else {
-      const w = 6 + Math.random() * 9;
-      const h = 4 + Math.random() * 8;
+      const w = 6 + Math.random() * 8;
+      const h = 4 + Math.random() * 7;
       shard.style.width = `${w}px`;
       shard.style.height = `${h}px`;
       shard.style.borderRadius = Math.random() > 0.5 ? '50%' : '3px';
@@ -799,9 +789,9 @@ function burstBalloon(balloon, color, callback) {
     burstWrap.appendChild(shard);
     
     const angle = (Math.PI * 2 * i) / shardCount + (Math.random() - 0.5) * 0.4;
-    const distance = 55 + Math.random() * 85;
+    const distance = 50 + Math.random() * 80;
     const destX = Math.cos(angle) * distance;
-    const destY = Math.sin(angle) * distance + 20; // gravity effect
+    const destY = Math.sin(angle) * distance + 15; // gravity effect
     
     if (motion) {
       motion.fromTo(shard,
@@ -812,7 +802,7 @@ function burstBalloon(balloon, color, callback) {
           scale: 0.2,
           opacity: 0,
           rotation: (Math.random() - 0.5) * 720,
-          duration: 0.48 + Math.random() * 0.35,
+          duration: 0.45 + Math.random() * 0.3,
           ease: 'power3.out'
         }
       );
@@ -822,9 +812,9 @@ function burstBalloon(balloon, color, callback) {
   // Balloon pop squash & vanish
   if (motion) {
     motion.to(balloon, {
-      scale: 1.35,
+      scale: 1.3,
       opacity: 0,
-      duration: 0.16,
+      duration: 0.14,
       ease: 'power1.out',
       onComplete: () => {
         balloon.classList.add('popped');
@@ -837,7 +827,7 @@ function burstBalloon(balloon, color, callback) {
   setTimeout(() => {
     burstWrap.remove();
     if (callback) callback();
-  }, 420);
+  }, 380);
 }
 
 function createBalloons() {
@@ -846,7 +836,8 @@ function createBalloons() {
   field.innerHTML = '';
   popped = 0;
   
-  initAmbientBalloons();
+  const ambientLayer = $('#ambientBalloons');
+  if (ambientLayer) ambientLayer.innerHTML = '';
 
   const completeCard = $('#balloonCompleteCard');
   if (completeCard) {
@@ -876,8 +867,14 @@ function createBalloons() {
     shine.className = 'balloon-shine';
     balloon.appendChild(shine);
 
-    balloon.addEventListener('click', () => {
-      if (balloon.classList.contains('popped') || balloon.classList.contains('popping')) return;
+    let isPoppingThis = false;
+    const popThisBalloon = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      if (isPoppingThis || balloon.classList.contains('popped') || balloon.classList.contains('popping')) return;
+      isPoppingThis = true;
       balloon.classList.add('popping');
       
       burstBalloon(balloon, colors[index], () => {
@@ -914,11 +911,14 @@ function createBalloons() {
           }, 300);
         }
       });
-    });
+    };
+
+    balloon.addEventListener('click', popThisBalloon);
+    balloon.addEventListener('touchstart', popThisBalloon, { passive: false });
     field.appendChild(balloon);
   });
   
-  motion?.from('.balloon', { scale: 0, duration: 0.5, stagger: 0.07, ease: 'back.out(1.8)' });
+  motion?.from('.balloon', { scale: 0, duration: 0.5, stagger: 0.05, ease: 'back.out(1.8)' });
 }
 
 let sparkInterval = null;
@@ -1018,11 +1018,20 @@ function animateCakeEntrance() {
     });
 }
 
-$('#toCake').addEventListener('click', () => { 
-  hideScene($('#balloonScene')); 
-  showScene('#cakeScene'); 
-  setTimeout(animateCakeEntrance, 80);
-});
+const toCakeBtn = $('#toCake');
+if (toCakeBtn) {
+  const handleToCake = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    hideScene($('#balloonScene')); 
+    showScene('#cakeScene'); 
+    setTimeout(animateCakeEntrance, 80);
+  };
+  toCakeBtn.addEventListener('click', handleToCake);
+  toCakeBtn.addEventListener('touchend', handleToCake);
+}
 
 function triggerCakeSideConfetti() {
   const container = $('#cakeConfetti');
@@ -1034,7 +1043,7 @@ function triggerCakeSideConfetti() {
     '#118ab2', '#8338ec', '#ff99c8', '#ffffff', '#ffbe0b'
   ];
   const symbols = ['♥', '♡', '💖', '✨', '✦', '🌸', '•'];
-  const particleCountPerSide = 38;
+  const particleCountPerSide = 32;
 
   // Function to shoot from one corner
   const shootCannon = (isLeft) => {
@@ -1111,24 +1120,28 @@ function triggerCakeSideConfetti() {
   shootCannon(false); // Right Cannon
 }
 
-$('#flameButton').addEventListener('click', () => {
-  const cake = $('#flameButton');
-  if (cake.classList.contains('blown')) return;
-  cake.classList.add('blown');
-  stopCandleSparkles();
-  triggerCakeSideConfetti();
-  
-  setTimeout(() => {
-    showMessage(
-      'Make a wish, close your eyes... and remember that mine has always been you. ♡',
-      () => {
-        // Only transition to the cinematic birthday reveal after user clicks "aww, thank you ♡"
-        hideScene($('#cakeScene'));
-        showBirthdayReveal();
-      }
-    );
-  }, 750);
-});
+const flameBtn = $('#flameButton');
+if (flameBtn) {
+  const handleBlowFlame = (e) => {
+    if (e && e.type === 'touchstart') e.preventDefault();
+    if (flameBtn.classList.contains('blown')) return;
+    flameBtn.classList.add('blown');
+    stopCandleSparkles();
+    triggerCakeSideConfetti();
+    
+    setTimeout(() => {
+      showMessage(
+        'Make a wish, close your eyes... and remember that mine has always been you. ♡',
+        () => {
+          hideScene($('#cakeScene'));
+          showBirthdayReveal();
+        }
+      );
+    }, 750);
+  };
+  flameBtn.addEventListener('click', handleBlowFlame);
+  flameBtn.addEventListener('touchstart', handleBlowFlame, { passive: false });
+}
 
 function showBirthdayReveal() {
   const scene = $('#birthdayScene');
@@ -1166,6 +1179,8 @@ $('#toRoses').addEventListener('click', () => {
 // --- 3D INTERACTIVE ROSE BOUQUET (THREE.JS) ---
 // ==========================================
 let rose3DInitialized = false;
+let isRose3DActive = false;
+let roseClock = null;
 let rose3DScene, rose3DCamera, rose3DRenderer;
 let rose3DBouquetGroup, rose3DRotGroup;
 let roseBackgroundPetals = [];
@@ -1180,11 +1195,18 @@ let roseTransitionComplete = false;
 let roseAnimFrameId = null;
 let roseTextureCache = {};
 
-function init3DRoseScene() {
-  const container = document.getElementById('rose3dContainer');
-  if (!container || !window.THREE) return;
+function pause3DRoseScene() {
+  isRose3DActive = false;
+  if (roseAnimFrameId) {
+    cancelAnimationFrame(roseAnimFrameId);
+    roseAnimFrameId = null;
+  }
+}
 
-  if (rose3DInitialized) {
+function resume3DRoseScene() {
+  if (!rose3DInitialized) {
+    init3DRoseScene();
+  } else {
     onRoseResize();
     roseTransitionComplete = false;
     roseScrollProgress = 0;
@@ -1192,10 +1214,25 @@ function init3DRoseScene() {
       rose3DBouquetGroup.position.set(0, 0.05, 0);
       rose3DBouquetGroup.scale.set(0.58, 0.58, 0.58);
     }
+    if (!isRose3DActive) {
+      isRose3DActive = true;
+      if (roseClock) roseClock.getDelta();
+      animateRoses();
+    }
+  }
+}
+
+function init3DRoseScene() {
+  const container = document.getElementById('rose3dContainer');
+  if (!container || !window.THREE) return;
+
+  if (rose3DInitialized) {
+    resume3DRoseScene();
     return;
   }
 
   rose3DInitialized = true;
+  isRose3DActive = true;
   roseTransitionComplete = false;
   roseScrollProgress = 0;
 
@@ -1207,10 +1244,10 @@ function init3DRoseScene() {
   rose3DCamera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
   rose3DCamera.position.set(0, 0.05, 4.85);
 
-  // 2. High-Performance Renderer
+  // 2. High-Performance Renderer (capped DPR for silky smooth 60fps on mobile)
   rose3DRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
   rose3DRenderer.setSize(width, height);
-  rose3DRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  rose3DRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   rose3DRenderer.outputEncoding = THREE.sRGBEncoding || 3001;
   container.appendChild(rose3DRenderer.domElement);
 
@@ -1245,7 +1282,7 @@ function init3DRoseScene() {
   // 5. Build Ultra-Realistic 3D Bouquet
   buildRealisticBouquet(rose3DBouquetGroup);
 
-  // 6. Build Full-Screen Falling Background Petals (80 Petals Across Viewport)
+  // 6. Build Full-Screen Falling Background Petals
   buildFullScreenFallingPetals(rose3DScene);
 
   // 7. Raycasting & Interaction Setup
@@ -1255,12 +1292,13 @@ function init3DRoseScene() {
   setupRoseInteractions(container);
 
   // 8. Fluid Animation Loop
-  const clock = new THREE.Clock();
+  roseClock = new THREE.Clock();
 
   function animateRoses() {
+    if (!isRose3DActive) return;
     roseAnimFrameId = requestAnimationFrame(animateRoses);
-    const delta = clock.getDelta();
-    const elapsedTime = clock.getElapsedTime();
+    const delta = roseClock.getDelta();
+    const elapsedTime = roseClock.getElapsedTime();
 
     // Subtle Natural Breathing & Sway
     const idleSwayX = Math.sin(elapsedTime * 1.3) * 0.025;
@@ -1301,7 +1339,7 @@ function onRoseResize() {
   rose3DCamera.aspect = width / height;
   rose3DCamera.updateProjectionMatrix();
   rose3DRenderer.setSize(width, height);
-  rose3DRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  rose3DRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 }
 
 // --- Procedural Textures for Velvet Petals & Leaves ---
@@ -1749,11 +1787,12 @@ function buildRealisticBouquet(bouquetGroup) {
   }
 }
 
-// --- Full-Screen Falling Flower Petals System (80 Multi-Colored Petals) ---
+// --- Full-Screen Falling Flower Petals System (Optimized & Lush) ---
 function buildFullScreenFallingPetals(scene) {
   roseBackgroundPetals = [];
   const petalColors = [0xff004f, 0xff1493, 0xff4500, 0xff2a85, 0xff6b8b, 0xffffff, 0xffccd5];
-  const count = 80;
+  const isMobile = window.innerWidth < 640;
+  const count = isMobile ? 28 : 60;
 
   for (let i = 0; i < count; i++) {
     const col = petalColors[Math.floor(Math.random() * petalColors.length)];
