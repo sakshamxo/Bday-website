@@ -148,18 +148,58 @@ function dodgeRejectButton(event) {
 }
 
 let modalCloseCallback = null;
+let isModalClosing = false;
+
+function closeNoteModal() {
+  if (isModalClosing) return;
+  isModalClosing = true;
+  
+  const cb = modalCloseCallback;
+  modalCloseCallback = null;
+
+  // Immediately remove pointer interaction so underlying buttons & balloons work without delay
+  modal.style.pointerEvents = 'none';
+
+  if (motion) {
+    motion.to('.modal-backdrop', { opacity: 0, duration: 0.16 });
+    motion.to('.modal-card', {
+      scale: 0.8,
+      opacity: 0,
+      y: 15,
+      duration: 0.18,
+      ease: 'power2.in',
+      onComplete: () => {
+        modal.classList.remove('show');
+        modal.style.display = 'none';
+        resetModalButtons();
+        isModalClosing = false;
+        if (cb) cb();
+      }
+    });
+  } else {
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+    resetModalButtons();
+    isModalClosing = false;
+    if (cb) cb();
+  }
+}
 
 function showMessage(message, onClose = null) {
+  isModalClosing = false;
   modalCloseCallback = onClose;
   $('#modalText').textContent = message;
   resetModalButtons();
   modal.classList.add('show');
+  modal.style.display = 'flex';
+  modal.style.pointerEvents = 'auto';
   
   if (motion) {
-    motion.fromTo('.modal-backdrop', { opacity: 0 }, { opacity: 1, duration: 0.25 });
+    motion.killTweensOf(['.modal-backdrop', '.modal-card']);
+    motion.fromTo('.modal-backdrop', { opacity: 0 }, { opacity: 1, duration: 0.22 });
     motion.fromTo('.modal-card', 
       { scale: 0.65, opacity: 0, y: 30 }, 
-      { scale: 1, opacity: 1, y: 0, duration: 0.42, ease: 'back.out(1.6)' }
+      { scale: 1, opacity: 1, y: 0, duration: 0.38, ease: 'back.out(1.6)' }
     );
   }
 }
@@ -172,35 +212,37 @@ function playMusic() {
   audio.play().then(() => setMusicState(true)).catch(() => setMusicState(false));
 }
 
-$('#closeModal').addEventListener('click', () => {
-  const cb = modalCloseCallback;
-  modalCloseCallback = null;
+const acceptCloseBtn = $('#closeModal');
+if (acceptCloseBtn) {
+  const handleModalAccept = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    closeNoteModal();
+  };
+  acceptCloseBtn.addEventListener('click', handleModalAccept);
+  acceptCloseBtn.addEventListener('pointerdown', handleModalAccept);
+}
 
-  if (motion) {
-    motion.to('.modal-backdrop', { opacity: 0, duration: 0.2 });
-    motion.to('.modal-card', {
-      scale: 0.8,
-      opacity: 0,
-      y: 20,
-      duration: 0.22,
-      ease: 'power2.in',
-      onComplete: () => {
-        modal.classList.remove('show');
-        resetModalButtons();
-        if (cb) cb();
-      }
-    });
-  } else {
-    modal.classList.remove('show');
-    resetModalButtons();
-    if (cb) cb();
-  }
-});
+const modalBackdrop = $('.modal-backdrop');
+if (modalBackdrop) {
+  const handleBackdropTap = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    closeNoteModal();
+  };
+  modalBackdrop.addEventListener('click', handleBackdropTap);
+  modalBackdrop.addEventListener('pointerdown', handleBackdropTap);
+}
 
 const noThanksBtn = $('#noThanksModal');
 if (noThanksBtn) {
   noThanksBtn.addEventListener('mouseenter', dodgeRejectButton);
   noThanksBtn.addEventListener('touchstart', dodgeRejectButton, { passive: false });
+  noThanksBtn.addEventListener('pointerdown', dodgeRejectButton);
   noThanksBtn.addEventListener('click', dodgeRejectButton);
 }
 musicToggle.addEventListener('click', () => audio.paused ? playMusic() : audio.pause());
@@ -340,7 +382,11 @@ function launchOpening() {
         motion.to(startArrow, { opacity: 0, duration: 0.2, delay: 0.1 });
         
         setTimeout(() => {
-          $('#opening').classList.add('is-gone');
+          const op = $('#opening');
+          if (op) {
+            op.classList.add('is-gone');
+            op.style.display = 'none';
+          }
           showScene('#giftScene');
         }, 950);
       }
@@ -351,7 +397,11 @@ function launchOpening() {
       targetHeart.classList.add('hit');
       createHeartHitBurst();
       setTimeout(() => {
-        $('#opening').classList.add('is-gone');
+        const op = $('#opening');
+        if (op) {
+          op.classList.add('is-gone');
+          op.style.display = 'none';
+        }
         showScene('#giftScene');
       }, 950);
     }, 380);
@@ -870,40 +920,42 @@ function createBalloons() {
       if (isPoppingThis || balloon.classList.contains('popped') || balloon.classList.contains('popping')) return;
       isPoppingThis = true;
       balloon.classList.add('popping');
+      balloon.style.pointerEvents = 'none';
       
       burstBalloon(balloon, colors[index], () => {
         popped++;
-        showMessage(note);
-        if (popped === balloonNotes.length) {
-          $('#balloonHint').textContent = 'You found every sweet note! 🎉';
-          
-          setTimeout(() => {
-            if (motion) {
-              motion.to(field, {
-                opacity: 0,
-                scale: 0.85,
-                duration: 0.35,
-                onComplete: () => {
-                  field.style.display = 'none';
-                  if (completeCard) {
-                    completeCard.style.display = 'flex';
-                    completeCard.classList.add('show');
-                    motion.fromTo(completeCard,
-                      { scale: 0.7, opacity: 0, y: 25 },
-                      { scale: 1, opacity: 1, y: 0, duration: 0.55, ease: 'back.out(1.6)' }
-                    );
+        showMessage(note, () => {
+          if (popped === balloonNotes.length) {
+            $('#balloonHint').textContent = 'You found every sweet note! 🎉';
+            
+            setTimeout(() => {
+              if (motion) {
+                motion.to(field, {
+                  opacity: 0,
+                  scale: 0.85,
+                  duration: 0.35,
+                  onComplete: () => {
+                    field.style.display = 'none';
+                    if (completeCard) {
+                      completeCard.style.display = 'flex';
+                      completeCard.classList.add('show');
+                      motion.fromTo(completeCard,
+                        { scale: 0.7, opacity: 0, y: 25 },
+                        { scale: 1, opacity: 1, y: 0, duration: 0.55, ease: 'back.out(1.6)' }
+                      );
+                    }
                   }
+                });
+              } else {
+                field.style.display = 'none';
+                if (completeCard) {
+                  completeCard.style.display = 'flex';
+                  completeCard.classList.add('show');
                 }
-              });
-            } else {
-              field.style.display = 'none';
-              if (completeCard) {
-                completeCard.style.display = 'flex';
-                completeCard.classList.add('show');
               }
-            }
-          }, 300);
-        }
+            }, 250);
+          }
+        });
       });
     };
 
@@ -1019,17 +1071,21 @@ function animateCakeEntrance() {
 
 const toCakeBtn = $('#toCake');
 if (toCakeBtn) {
+  let isNavigatingToCake = false;
   const handleToCake = (e) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
+    if (isNavigatingToCake) return;
+    isNavigatingToCake = true;
     hideScene($('#balloonScene')); 
     showScene('#cakeScene'); 
     setTimeout(animateCakeEntrance, 80);
+    setTimeout(() => { isNavigatingToCake = false; }, 800);
   };
   toCakeBtn.addEventListener('click', handleToCake);
-  toCakeBtn.addEventListener('touchend', handleToCake);
+  toCakeBtn.addEventListener('pointerdown', handleToCake);
 }
 
 function triggerCakeSideConfetti() {
@@ -1169,10 +1225,23 @@ function showBirthdayReveal() {
     '-=0.25'
   );
 }
-$('#toRoses').addEventListener('click', () => { 
-  hideScene($('#birthdayScene')); 
-  showScene('#roseScene'); 
-});
+const toRosesBtn = $('#toRoses');
+if (toRosesBtn) {
+  let isNavigatingToRoses = false;
+  const handleToRoses = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (isNavigatingToRoses) return;
+    isNavigatingToRoses = true;
+    hideScene($('#birthdayScene')); 
+    showScene('#roseScene');
+    setTimeout(() => { isNavigatingToRoses = false; }, 800);
+  };
+  toRosesBtn.addEventListener('click', handleToRoses);
+  toRosesBtn.addEventListener('pointerdown', handleToRoses);
+}
 
 // ==========================================
 // --- 3D INTERACTIVE ROSE BOUQUET (THREE.JS) ---
@@ -2064,9 +2133,15 @@ function setupRoseInteractions(container) {
   // Button Trigger: Take Bouquet
   const takeBouquetBtn = $('#takeBouquetBtn');
   if (takeBouquetBtn) {
-    takeBouquetBtn.addEventListener('click', () => {
+    const handleTakeBouquet = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       triggerRoseToMemoriesTransition();
-    });
+    };
+    takeBouquetBtn.addEventListener('click', handleTakeBouquet);
+    takeBouquetBtn.addEventListener('pointerdown', handleTakeBouquet);
   }
 }
 

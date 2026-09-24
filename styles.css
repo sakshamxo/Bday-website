@@ -134,6 +134,7 @@ h1 em, h2 em {
   opacity: 0;
   transform: scale(1.08);
   pointer-events: none;
+  display: none !important;
 }
 
 /* Ambient Romantic Atmosphere & Glow Orbs */
@@ -2351,7 +2352,6 @@ h1 em, h2 em {
   color: #9f536e;
 }
 
-/* Ultra-Premium Glassmorphism Secret Note Modal */
 .modal {
   display: none;
   position: fixed;
@@ -2360,10 +2360,12 @@ h1 em, h2 em {
   padding: 20px;
   align-items: center;
   justify-content: center;
+  pointer-events: none;
 }
 
 .modal.show {
   display: flex;
+  pointer-events: auto;
 }
 
 .modal-backdrop {
