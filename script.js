@@ -704,20 +704,24 @@ if (giftBtn) {
 // Proceed from Video Card to Balloon Scene
 const toBalloonsBtn = $('#toBalloons');
 if (toBalloonsBtn) {
+  let isNavigatingToBalloons = false;
   const handleToBalloons = (e) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
+    if (isNavigatingToBalloons) return;
+    isNavigatingToBalloons = true;
     if (giftVideo && !giftVideo.paused) {
-      giftVideo.pause();
+      try { giftVideo.pause(); } catch(err) {}
     }
     hideScene($('#giftScene'));
     showScene('#balloonScene');
     createBalloons();
+    setTimeout(() => { isNavigatingToBalloons = false; }, 800);
   };
   toBalloonsBtn.addEventListener('click', handleToBalloons);
-  toBalloonsBtn.addEventListener('touchend', handleToBalloons);
+  toBalloonsBtn.addEventListener('pointerdown', handleToBalloons);
 }
 
 const balloonNotes = [
@@ -809,20 +813,10 @@ function burstBalloon(balloon, color, callback) {
     }
   }
 
-  // Balloon pop squash & vanish
-  if (motion) {
-    motion.to(balloon, {
-      scale: 1.3,
-      opacity: 0,
-      duration: 0.14,
-      ease: 'power1.out',
-      onComplete: () => {
-        balloon.classList.add('popped');
-      }
-    });
-  } else {
-    balloon.classList.add('popped');
-  }
+  // Hide the popped balloon instantly
+  balloon.classList.add('popped');
+  balloon.style.opacity = '0';
+  balloon.style.pointerEvents = 'none';
 
   setTimeout(() => {
     burstWrap.remove();
@@ -914,11 +908,16 @@ function createBalloons() {
     };
 
     balloon.addEventListener('click', popThisBalloon);
-    balloon.addEventListener('touchstart', popThisBalloon, { passive: false });
+    balloon.addEventListener('pointerdown', popThisBalloon);
     field.appendChild(balloon);
   });
   
-  motion?.from('.balloon', { scale: 0, duration: 0.5, stagger: 0.05, ease: 'back.out(1.8)' });
+  if (motion) {
+    motion.fromTo(field,
+      { opacity: 0, scale: 0.92 },
+      { opacity: 1, scale: 1, duration: 0.45, ease: 'back.out(1.5)' }
+    );
+  }
 }
 
 let sparkInterval = null;

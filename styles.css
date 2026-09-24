@@ -31,6 +31,11 @@ button {
   font: inherit;
   border: 0;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button * {
+  pointer-events: none;
 }
 
 .grain {
@@ -2501,7 +2506,10 @@ h1 em, h2 em {
 @keyframes drift { to { transform: translateX(120vw); } }
 @keyframes sceneIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 @keyframes float { 50% { transform: translateY(-18px) rotate(12deg); } }
-@keyframes balloonBob { 50% { transform: translateY(-12px) rotate(2.5deg); } }
+@keyframes balloonBob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-7px) rotate(2deg); }
+}
 @keyframes bowAway { to { transform: translateY(-95px) rotate(40deg); opacity: 0; } }
 @keyframes flicker { to { transform: rotate(180deg) scale(.84, 1.1); } }
 @keyframes smoke { to { transform: translateY(-35px) translateX(12px); opacity: 0; } }
