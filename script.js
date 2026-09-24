@@ -179,13 +179,25 @@ function showMessage(message, onClose = null) {
     );
   }
 }
+let userWantsMusic = true;
+
 function setMusicState(isPlaying) {
   musicToggle.classList.toggle('playing', isPlaying);
   musicToggle.setAttribute('aria-label', isPlaying ? 'Pause background music' : 'Play background music');
   musicToggle.querySelector('i').textContent = isPlaying ? 'pause' : 'music';
 }
 function playMusic() {
-  audio.play().then(() => setMusicState(true)).catch(() => setMusicState(false));
+  if (!audio) return;
+  audio.play().then(() => {
+    audioUnlocked = true;
+    userWantsMusic = true;
+    setMusicState(true);
+  }).catch(() => setMusicState(false));
+}
+function pauseMusic() {
+  if (!audio) return;
+  audio.pause();
+  setMusicState(false);
 }
 
 const acceptCloseBtn = $('#closeModal');
@@ -221,7 +233,15 @@ if (noThanksBtn) {
   noThanksBtn.addEventListener('pointerdown', dodgeRejectButton);
   noThanksBtn.addEventListener('click', dodgeRejectButton);
 }
-musicToggle.addEventListener('click', () => audio.paused ? playMusic() : audio.pause());
+musicToggle.addEventListener('click', () => {
+  if (audio.paused) {
+    userWantsMusic = true;
+    playMusic();
+  } else {
+    userWantsMusic = false;
+    pauseMusic();
+  }
+});
 audio.addEventListener('pause', () => setMusicState(false));
 audio.addEventListener('play', () => setMusicState(true));
 
@@ -536,16 +556,22 @@ if (giftVideo) {
   giftVideo.addEventListener('play', () => {
     videoPlayerWrapper?.classList.add('is-playing');
     if (audio && !audio.paused) {
-      wasBgMusicPlaying = true;
       audio.pause();
+      setMusicState(false);
     }
   });
   
   giftVideo.addEventListener('pause', () => {
     videoPlayerWrapper?.classList.remove('is-playing');
-    if (wasBgMusicPlaying) {
+    if (userWantsMusic) {
       playMusic();
-      wasBgMusicPlaying = false;
+    }
+  });
+  
+  giftVideo.addEventListener('ended', () => {
+    videoPlayerWrapper?.classList.remove('is-playing');
+    if (userWantsMusic) {
+      playMusic();
     }
   });
   
@@ -553,14 +579,6 @@ if (giftVideo) {
     if (giftVideo.duration && videoProgressFill) {
       const pct = (giftVideo.currentTime / giftVideo.duration) * 100;
       videoProgressFill.style.width = `${pct}%`;
-    }
-  });
-  
-  giftVideo.addEventListener('ended', () => {
-    videoPlayerWrapper?.classList.remove('is-playing');
-    if (wasBgMusicPlaying) {
-      playMusic();
-      wasBgMusicPlaying = false;
     }
   });
 }
@@ -740,6 +758,9 @@ if (toBalloonsBtn) {
     isNavigatingToBalloons = true;
     if (giftVideo && !giftVideo.paused) {
       try { giftVideo.pause(); } catch(err) {}
+    }
+    if (userWantsMusic) {
+      playMusic();
     }
     hideScene($('#giftScene'));
     showScene('#balloonScene');
